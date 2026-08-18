@@ -1,0 +1,175 @@
+# ============================================================
+# MODERN KUBERNETES GATEWAY API LAB
+# ============================================================
+
+# ============================================================
+# 1. GatewayClass
+# ============================================================
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+
+metadata:
+  name: traefik
+
+spec:
+  controllerName: traefik.io/gateway-controller
+
+---
+# ============================================================
+# 2. Gateway
+# ============================================================
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+
+metadata:
+  name: main-gateway
+  namespace: default
+
+spec:
+  gatewayClassName: traefik
+
+  listeners:
+    # ========================================================
+    # HTTP
+    # ========================================================
+
+    - name: http
+
+      protocol: HTTP
+
+      port: 80
+
+      hostname: "*.chetan.local"
+
+      allowedRoutes:
+        namespaces:
+          from: Same
+
+    # ========================================================
+    # HTTPS
+    # ========================================================
+
+    - name: https
+
+      protocol: HTTPS
+
+      port: 443
+
+      hostname: "*.chetan.local"
+
+      tls:
+        mode: Terminate
+
+        certificateRefs:
+          - name: chetan-local-tls
+
+      allowedRoutes:
+        namespaces:
+          from: Same
+
+---
+# ============================================================
+# 3. Application Deployment
+# ============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: foo-app
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: foo-app
+
+  template:
+    metadata:
+      labels:
+        app: foo-app
+
+    spec:
+      containers:
+        - name: foo-app
+
+          image: registry.k8s.io/e2e-test-images/agnhost:2.39
+
+          command:
+            - /agnhost
+            - serve-hostname
+            - --http=true
+            - --port=8080
+
+          ports:
+            - name: http
+              containerPort: 8080
+
+---
+# ============================================================
+# 4. ClusterIP Service
+# ============================================================
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: foo-service
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app: foo-app
+
+  ports:
+    - name: http
+
+      port: 8080
+
+      targetPort: 8080
+
+---
+# ============================================================
+# 5. HTTPRoute
+#
+# app.chetan.local
+#       ↓
+# main-gateway :443
+#       ↓
+# foo-route
+#       ↓
+# foo-service
+#       ↓
+# foo-app
+# ============================================================
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+
+metadata:
+  name: foo-route
+
+spec:
+  parentRefs:
+    - name: main-gateway
+
+      sectionName: https
+
+  hostnames:
+    - "app.chetan.local"
+
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+
+            value: /
+
+      backendRefs:
+        - name: foo-service
+
+          port: 8080
