@@ -1,0 +1,45 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+name: gitops-demo-cluster
+
+nodes:
+  # ==========================================================
+  # Control Plane
+  # ==========================================================
+
+  - role: control-plane
+
+    image: kindest/node:v1.36.1
+
+    extraPortMappings:
+      # ------------------------------------------------------
+      # HTTP
+      # Windows 127.0.0.1:80
+      #         ↓
+      # KIND node :80
+      # ------------------------------------------------------
+
+      - containerPort: 80
+        hostPort: 80
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+
+      # ------------------------------------------------------
+      # HTTPS
+      # Windows 127.0.0.1:443
+      #         ↓
+      # KIND node :443
+      # ------------------------------------------------------
+
+      - containerPort: 443
+        hostPort: 443
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+
+  # ----------------------------------------------------------
+  # Add workers later if required
+  # ----------------------------------------------------------
+
+  # - role: worker
+  # - role: worker
